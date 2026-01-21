@@ -1,27 +1,22 @@
-import { ConfigService } from '@nestjs/config';
-import { KafkaConfig } from 'kafkajs';
-
-export const getKafkaConfig = (configService: ConfigService): KafkaConfig => ({
-  clientId: configService.get<string>(
-    'KAFKA_CLIENT_ID',
-    'cinema-booking-system',
-  ),
-  brokers: configService
-    .get<string>('KAFKA_BROKERS', 'localhost:9092')
-    .split(','),
-  retry: {
-    initialRetryTime: 100,
-    retries: 8,
-    maxRetryTime: 30000,
-    multiplier: 2,
-  },
-  connectionTimeout: 10000,
-  requestTimeout: 30000,
-});
+import { ClientOptions, Transport } from '@nestjs/microservices';
 
 export const KAFKA_TOPICS = {
   RESERVATION_CREATED: 'reservation.created',
-  RESERVATION_EXPIRED: 'reservation.expired',
   PAYMENT_CONFIRMED: 'payment.confirmed',
   SEAT_RELEASED: 'seat.released',
-} as const;
+};
+
+// Configuração para conectar no Kafka
+// O broker 'kafka:9093' é o endereço interno do Docker (veja seu docker-compose)
+export const kafkaConfig: ClientOptions = {
+  transport: Transport.KAFKA,
+  options: {
+    client: {
+      clientId: 'cinema-booking-client',
+      brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+    },
+    consumer: {
+      groupId: 'cinema-booking-consumer-group', // Importante para não processar msg duplicada
+    },
+  },
+};

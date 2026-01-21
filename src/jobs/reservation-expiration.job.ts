@@ -8,14 +8,10 @@ export class ReservationExpirationJob {
 
   constructor(private readonly reservationService: ReservationService) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
-  async handleReservationExpiration() {
-    this.logger.debug('Executando job de expiração de reservas');
-
-    try {
-      await this.reservationService.expireReservations();
-    } catch (error) {
-      this.logger.error('Erro ao executar job de expiração', error);
-    }
+  // Roda a cada 10 segundos para verificar reservas expiradas
+  @Cron('*/10 * * * * *')
+  async handleCron() {
+    // this.logger.debug('Verificando reservas expiradas...');
+    await this.reservationService.expireReservations();
   }
 }

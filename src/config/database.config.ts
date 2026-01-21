@@ -1,26 +1,33 @@
-import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config';
-import { Session } from '../modules/session/entities/session.entity';
-import { Seat } from '../modules/session/entities/seat.entity';
-import { Reservation } from '../modules/reservation/entities/reservation.entity';
-import { Sale } from '../modules/reservation/entities/sale.entity';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-export const getDatabaseConfig = (
-  configService: ConfigService,
-): TypeOrmModuleOptions => ({
+// Carrega o .env
+const envPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath });
+
+// Funcao auxiliar para corrigir barras no Windows
+// Transforma C:\Users\Src\** em C:/Users/Src/**
+const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
+const entitiesPath = path.join(__dirname, '..', '**', '*.entity{.ts,.js}');
+const migrationsPath = path.join(__dirname, '..', 'database', 'migrations', '*{.ts,.js}');
+
+export const databaseConfig: DataSourceOptions = {
   type: 'postgres',
-  host: configService.get<string>('DATABASE_HOST', 'localhost'),
-  port: configService.get<number>('DATABASE_PORT', 5432),
-  username: configService.get<string>('DATABASE_USER', 'cinema_user'),
-  password: configService.get<string>('DATABASE_PASSWORD', 'cinema_password'),
-  database: configService.get<string>('DATABASE_NAME', 'cinema_db'),
-  entities: [Session, Seat, Reservation, Sale],
-  synchronize: configService.get<boolean>('DATABASE_SYNC', true),
-  logging: configService.get<boolean>('DATABASE_LOGGING', false),
-  poolSize: 20,
-  extra: {
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-  },
-});
+  host: process.env.DATABASE_HOST || 'localhost',
+  port: parseInt(process.env.DATABASE_PORT, 10) || 5432,
+  username: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
+  
+  // AQUI O SEGREDO: Normalizamos o caminho para usar barras /
+  entities: [normalizePath(entitiesPath)],
+  migrations: [normalizePath(migrationsPath)],
+  
+  synchronize: false,
+  logging: process.env.NODE_ENV === 'development',
+};
+
+const dataSource = new DataSource(databaseConfig);
+export default dataSource;

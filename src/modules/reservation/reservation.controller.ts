@@ -1,18 +1,10 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Param,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
-import { Reservation } from './entities/reservation.entity';
-import { Sale } from './entities/sale.entity';
+// Importe a entidade Reservation se quiser usar no type, ou crie um ResponseDTO
+import { Reservation } from './entities/reservation.entity'; 
 
 @ApiTags('Reservas')
 @Controller('reservations')
@@ -21,60 +13,34 @@ export class ReservationController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Criar nova reserva de assento(s)' })
+  @ApiOperation({ 
+    summary: 'Reservar assentos',
+    description: 'Bloqueia os assentos temporariamente. Exige confirmação de pagamento.' 
+  })
   @ApiResponse({
     status: 201,
-    description: 'Reserva criada com sucesso',
+    description: 'Reserva iniciada. Aguardando pagamento.',
+    schema: {
+      example: {
+        mensagem: 'Reserva criada com sucesso',
+        reservas: [{ id: '...', status: 'pending' }],
+        expira_em: '2026-02-20T19:15:00Z'
+      }
+    }
   })
   @ApiResponse({
     status: 409,
-    description: 'Assento não disponível',
+    description: 'Conflito: Assento já ocupado.',
+    schema: { example: { statusCode: 409, message: 'Assento A1 indisponível' } }
   })
-  async createReservation(
-    @Body() dto: CreateReservationDto,
-  ): Promise<{
-    mensagem: string;
-    reservas: Reservation[];
-    expira_em: string;
-  }> {
-    const reservations = await this.reservationService.createReservation(dto);
-
-    return {
-      mensagem: 'Reserva criada com sucesso',
-      reservas: reservations,
-      expira_em: reservations[0].expires_at.toISOString(),
-    };
+  createReservation(@Body() dto: CreateReservationDto) {
+    return this.reservationService.createReservation(dto);
   }
 
   @Post('confirm-payment')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Confirmar pagamento de reserva' })
-  @ApiResponse({
-    status: 200,
-    description: 'Pagamento confirmado com sucesso',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Reserva expirada ou inválida',
-  })
-  async confirmPayment(
-    @Body() dto: ConfirmPaymentDto,
-  ): Promise<{ mensagem: string; venda: Sale }> {
-    const sale = await this.reservationService.confirmPayment(dto);
-
-    return {
-      mensagem: 'Pagamento confirmado com sucesso',
-      venda: sale,
-    };
-  }
-
-  @Get('user/:userId/purchases')
-  @ApiOperation({ summary: 'Buscar histórico de compras do usuário' })
-  @ApiResponse({
-    status: 200,
-    description: 'Histórico de compras retornado com sucesso',
-  })
-  async getUserPurchases(@Param('userId') userId: string): Promise<Sale[]> {
-    return this.reservationService.getUserPurchases(userId);
+  @ApiOperation({ summary: 'Confirmar pagamento e finalizar venda' })
+  @ApiResponse({ status: 200, description: 'Venda confirmada' })
+  confirmPayment(@Body() dto: ConfirmPaymentDto) {
+    return this.reservationService.confirmPayment(dto);
   }
 }

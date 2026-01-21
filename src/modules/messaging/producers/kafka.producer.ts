@@ -1,69 +1,39 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Kafka, Producer, ProducerRecord } from 'kafkajs';
-import { getKafkaConfig } from '../../../config/kafka.config';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject } from '@nestjs/common';
+import { ClientKafka } from '@nestjs/microservices';
+import { lastValueFrom } from 'rxjs';
 
 @Injectable()
 export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaProducerService.name);
-  private readonly kafka: Kafka;
-  private readonly producer: Producer;
 
-  constructor(private readonly configService: ConfigService) {
-    this.kafka = new Kafka(getKafkaConfig(configService));
-    this.producer = this.kafka.producer({
-      retry: {
-        retries: 5,
-      },
-      idempotent: true,
-    });
-  }
+  constructor(
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
+  ) {}
 
   async onModuleInit() {
+    // Conecta no Kafka ao iniciar a aplicação
     try {
-      await this.producer.connect();
-      this.logger.log('Produtor Kafka conectado com sucesso');
+      await this.kafkaClient.connect();
+      this.logger.log('Conectado ao Kafka com sucesso!');
     } catch (error) {
-      this.logger.error('Erro ao conectar produtor Kafka', error);
-      throw error;
-    }
-  }
-
-  async produce(topic: string, message: any): Promise<void> {
-    try {
-      const record: ProducerRecord = {
-        topic,
-        messages: [
-          {
-            value: JSON.stringify(message),
-            timestamp: Date.now().toString(),
-          },
-        ],
-      };
-
-      await this.producer.send(record);
-      this.logger.log(`Mensagem publicada no tópico ${topic}`);
-      this.logger.debug(`Payload: ${JSON.stringify(message)}`);
-    } catch (error) {
-      this.logger.error(
-        `Erro ao publicar mensagem no tópico ${topic}`,
-        error,
-      );
-      throw error;
+      this.logger.error('Erro ao conectar no Kafka', error);
     }
   }
 
   async onModuleDestroy() {
+    await this.kafkaClient.close();
+  }
+
+  // Método genérico para enviar mensagens
+  async produce(topic: string, message: any) {
     try {
-      await this.producer.disconnect();
-      this.logger.log('Produtor Kafka desconectado');
+      // O 'emit' do NestJS retorna um Observable, usamos lastValueFrom para aguardar (Promise)
+      // 'emit' é fire-and-forget (não espera resposta), ideal para eventos.
+      await lastValueFrom(this.kafkaClient.emit(topic, message));
+      this.logger.log(`Mensagem enviada para o tópico: ${topic}`);
     } catch (error) {
-      this.logger.error('Erro ao desconectar produtor Kafka', error);
+      this.logger.error(`Erro ao enviar mensagem para ${topic}`, error);
+      // Não damos throw aqui para não derrubar a reserva se o Kafka falhar momentaneamente
     }
   }
 }
