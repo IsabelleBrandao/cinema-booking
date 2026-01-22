@@ -56,7 +56,7 @@ Além dos requisitos obrigatórios, este projeto inclui:
 
 1.  **Clone o repositório:**
     ```bash
-    git clone [https://github.com/IsabelleBrandao/cinema-booking.git](https://github.com/IsabelleBrandao/cinema-booking.git)
+    git clone https://github.com/IsabelleBrandao/cinema-booking.git
     cd cinema-booking
     ```
 
