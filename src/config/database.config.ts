@@ -21,7 +21,10 @@ export const databaseConfig: DataSourceOptions = {
   entities: [normalizePath(entitiesPath)],
   migrations: [normalizePath(migrationsPath)],
   
-  synchronize: false,
+  // 👇 AQUI ESTÁ O SEGREDO:
+  migrationsRun: true, // Roda as migrações automaticamente no boot
+  
+  synchronize: false, // Mantenha false para usar migrations corretamente
   logging: process.env.NODE_ENV === 'development',
 };
 
