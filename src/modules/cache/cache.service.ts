@@ -1,33 +1,50 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
 @Injectable()
 export class CacheService {
+  private readonly logger = new Logger(CacheService.name);
+
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   async get<T>(key: string): Promise<T | undefined> {
-    return this.cacheManager.get<T>(key);
+    try {
+      return await this.cacheManager.get<T>(key);
+    } catch (error) {
+      this.logger.error(`Erro ao buscar cache ${key}`, error);
+      return undefined;
+    }
   }
 
-  async set(key: string, value: any, ttl?: number): Promise<void> {
-    // ttl no cache-manager v5+ é em milissegundos, mas o redis-store as vezes trata como segundos.
-    // Vamos garantir um padrão seguro.
-    await this.cacheManager.set(key, value, ttl || 0); 
+  // ⚠️ CORREÇÃO: TTL em SEGUNDOS (padrão do Redis)
+  async set(key: string, value: any, ttlSeconds = 600): Promise<void> {
+    try {
+      await this.cacheManager.set(key, value, ttlSeconds);
+    } catch (error) {
+      this.logger.error(`Erro ao salvar cache ${key}`, error);
+    }
   }
 
   async del(key: string): Promise<void> {
-    await this.cacheManager.del(key);
+    try {
+      await this.cacheManager.del(key);
+    } catch (error) {
+      this.logger.error(`Erro ao deletar cache ${key}`, error);
+    }
   }
 
-  // Método avançado para limpar chaves por padrão (ex: limpar cache de uma sessão específica)
   async delPattern(pattern: string): Promise<void> {
-    const store = (this.cacheManager as any).store;
-    if (store.keys) {
-      const keys = await store.keys(pattern);
-      if (keys.length > 0) {
-        await store.del(keys);
+    try {
+      const store = (this.cacheManager as any).store;
+      if (store.keys) {
+        const keys = await store.keys(pattern);
+        if (keys.length > 0) {
+          await store.del(keys);
+        }
       }
+    } catch (error) {
+      this.logger.error(`Erro ao deletar padrão ${pattern}`, error);
     }
   }
 }

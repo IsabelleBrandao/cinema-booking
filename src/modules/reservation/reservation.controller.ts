@@ -3,8 +3,6 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
-// Importe a entidade Reservation se quiser usar no type, ou crie um ResponseDTO
-import { Reservation } from './entities/reservation.entity'; 
 
 @ApiTags('Reservas')
 @Controller('reservations')
@@ -42,5 +40,30 @@ export class ReservationController {
   @ApiResponse({ status: 200, description: 'Venda confirmada' })
   confirmPayment(@Body() dto: ConfirmPaymentDto) {
     return this.reservationService.confirmPayment(dto);
+  }
+
+  @Get('user/:userId/purchases')
+  @ApiOperation({ 
+    summary: 'Histórico de compras do usuário',
+    description: 'Retorna todas as vendas confirmadas de um usuário, ordenadas por data.' 
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de compras',
+    schema: {
+      example: [
+        {
+          id: 'sale-uuid',
+          sessionId: 'session-uuid',
+          movieName: 'Vingadores',
+          seatNumber: 'A1',
+          price: 25.00,
+          purchaseDate: '2026-01-20T19:00:00Z'
+        }
+      ]
+    }
+  })
+  async getUserPurchases(@Param('userId') userId: string) {
+    return this.reservationService.getUserPurchases(userId);
   }
 }

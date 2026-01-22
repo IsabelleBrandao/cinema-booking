@@ -3,14 +3,14 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { Session } from './entities/session.entity';
-import { SessionTransformer } from './transformer/session.transformer'; // Se estiver usando transformer
+import { SessionTransformer } from './transformer/session.transformer';
 
 @ApiTags('Sessões')
 @Controller('sessions')
 export class SessionController {
   constructor(
     private readonly sessionService: SessionService,
-    // private readonly sessionTransformer: SessionTransformer, // Descomente se usar transformer
+    private readonly sessionTransformer: SessionTransformer,
   ) {}
 
   @Post()
@@ -45,5 +45,29 @@ export class SessionController {
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
   findOne(@Param('id') id: string) {
     return this.sessionService.findSessionById(id);
+  }
+
+  // ===================================
+  // ⚠️ ENDPOINT FALTANTE #1 - OBRIGATÓRIO
+  // ===================================
+  @Get(':id/seats')
+  @ApiOperation({ 
+    summary: 'Buscar assentos disponíveis em tempo real',
+    description: 'Retorna apenas os assentos com status AVAILABLE. Usa cache Redis.' 
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de assentos disponíveis',
+    schema: {
+      example: [
+        { id: 'uuid', seatNumber: 'A1', status: 'available' },
+        { id: 'uuid', seatNumber: 'A2', status: 'available' }
+      ]
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  async getAvailableSeats(@Param('id') id: string) {
+    const seats = await this.sessionService.getAvailableSeats(id);
+    return this.sessionTransformer.toSeatResponseList(seats);
   }
 }
