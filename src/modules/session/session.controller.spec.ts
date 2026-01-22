@@ -16,7 +16,6 @@ describe('SessionController', () => {
       getAvailableSeats: jest.fn(),
     };
 
-    // Mock simples do Transformer
     mockTransformer = {
       toResponse: jest.fn((data) => data),
       toResponseList: jest.fn((data) => data),
@@ -30,7 +29,7 @@ describe('SessionController', () => {
           provide: SessionService,
           useValue: mockService,
         },
-        // Injeção do Transformer Mockado
+
         {
           provide: SessionTransformer,
           useValue: mockTransformer,

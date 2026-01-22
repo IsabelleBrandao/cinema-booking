@@ -15,14 +15,14 @@ import { ReservationTransformer } from './transformer/reservation.transformer'; 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reservation, Sale, Seat, Session]),
-    CacheModule,      // <--- Essencial
-    MessagingModule,  // <--- Essencial
+    CacheModule, // <--- Essencial
+    MessagingModule, // <--- Essencial
   ],
   controllers: [ReservationController],
   providers: [
-    ReservationService, 
+    ReservationService,
     ReservationExpirationJob,
-    ReservationTransformer // <--- Adicione aqui
+    ReservationTransformer, // <--- Adicione aqui
   ],
   exports: [ReservationService],
 })

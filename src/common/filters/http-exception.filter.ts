@@ -24,15 +24,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof AppError) {
       status = exception.statusCode;
       message = exception.message;
-    }
-
-    else if (exception instanceof HttpException) {
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
       message = typeof res === 'string' ? res : (res as any).message || res;
-    }
-
-    else {
+    } else {
       this.logger.error(`Error processing request ${request.url}`, exception);
     }
 

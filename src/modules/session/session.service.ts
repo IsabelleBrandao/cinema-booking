@@ -41,10 +41,10 @@ export class SessionService {
         );
       }
 
-      // 2. Criar a Sessão 
+      // 2. Criar a Sessão
       const session = this.sessionRepository.create({
-        ...dto, 
-        available_seats: dto.total_seats, 
+        ...dto,
+        available_seats: dto.total_seats,
         is_active: true,
       });
 
@@ -77,7 +77,7 @@ export class SessionService {
         }
       }
 
-      // Salva todos os assentos de uma vez 
+      // Salva todos os assentos de uma vez
       await queryRunner.manager.save(seats);
 
       // Confirma a transação no banco
@@ -132,7 +132,7 @@ export class SessionService {
   async getAvailableSeats(sessionId: string): Promise<Seat[]> {
     // Cache de curta duração (5s) para aguentar refresh frenético dos usuários
     const cacheKey = `session:seats:${sessionId}`;
-    
+
     const cachedSeats = await this.cacheService.get<Seat[]>(cacheKey);
     if (cachedSeats) {
       return cachedSeats;

@@ -18,10 +18,10 @@ import { DataSource } from 'typeorm';
 describe('ReservationService', () => {
   let service: ReservationService;
   let mockQueryRunner: any;
-  let mockQueryBuilder: any; // 1. Variável para segurar a instância do QueryBuilder
+  let mockQueryBuilder: any; 
 
   beforeEach(async () => {
-    // 2. Criamos o objeto FIXO do QueryBuilder
+
     mockQueryBuilder = {
       setLock: jest.fn().mockReturnThis(),
       innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -41,7 +41,6 @@ describe('ReservationService', () => {
         save: jest.fn(),
         increment: jest.fn(),
         decrement: jest.fn(),
-        // 3. Retornamos sempre a mesma instância
         createQueryBuilder: jest.fn(() => mockQueryBuilder),
       },
     };
@@ -117,7 +116,6 @@ describe('ReservationService', () => {
         seat_number: 'A1',
       };
 
-      // 4. Configuramos o retorno no objeto fixo
       mockQueryBuilder.getOne.mockResolvedValue(mockSeat);
 
       mockQueryRunner.manager.save.mockImplementation((entity) =>
@@ -153,7 +151,9 @@ describe('ReservationService', () => {
         idempotency_key: 'key-123',
       };
 
-      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ id: 'session-1' });
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        id: 'session-1',
+      });
 
       const mockSeat = {
         id: 'seat-1',
@@ -179,14 +179,16 @@ describe('ReservationService', () => {
       const duplicateError = new Error('Duplicate') as any;
       duplicateError.code = '23505';
 
-      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ id: 'session-1' });
-      
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        id: 'session-1',
+      });
+
       const mockSeat = {
         id: 'seat-1',
         status: SeatStatus.AVAILABLE,
         seat_number: 'A1',
       };
-      
+
       mockQueryBuilder.getOne.mockResolvedValue(mockSeat);
 
       mockQueryRunner.manager.save.mockRejectedValueOnce(duplicateError);
@@ -216,10 +218,12 @@ describe('ReservationService', () => {
 
       mockQueryBuilder.getOne.mockResolvedValue(mockReservation);
 
-      // Mock do findOne para o assento (chamado após salvar reserva)
       mockQueryRunner.manager.findOne.mockResolvedValue({ id: 'seat-1' });
 
-      mockQueryRunner.manager.save.mockResolvedValue({ id: 'sale-1', price: 25.0 });
+      mockQueryRunner.manager.save.mockResolvedValue({
+        id: 'sale-1',
+        price: 25.0,
+      });
 
       const result = await service.confirmPayment(dto);
 
@@ -228,15 +232,14 @@ describe('ReservationService', () => {
     });
 
     it('deve lançar erro se reserva não encontrada', async () => {
-        const dto = { reservation_id: 'res-1' };
-  
-        // Retorna null no getOne
-        mockQueryBuilder.getOne.mockResolvedValue(null);
-  
-        await expect(service.confirmPayment(dto)).rejects.toThrow(
-          NotFoundException,
-        );
-      });
+      const dto = { reservation_id: 'res-1' };
+
+      mockQueryBuilder.getOne.mockResolvedValue(null);
+
+      await expect(service.confirmPayment(dto)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
 
     it('deve lançar erro se reserva não está pendente', async () => {
       const dto = { reservation_id: 'res-1' };
@@ -260,7 +263,7 @@ describe('ReservationService', () => {
       const mockReservation = {
         id: 'res-1',
         status: ReservationStatus.PENDING,
-        expires_at: new Date(Date.now() - 10000), // Já expirou
+        expires_at: new Date(Date.now() - 10000), 
       };
 
       mockQueryBuilder.getOne.mockResolvedValue(mockReservation);

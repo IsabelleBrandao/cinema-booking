@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, LessThan, QueryFailedError } from 'typeorm';
+import { Repository, DataSource, LessThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Reservation, ReservationStatus } from './entities/reservation.entity';
 import { Sale } from './entities/sale.entity';
@@ -37,10 +37,9 @@ export class ReservationService {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
   ) {
-    this.reservationExpirationTime = Number(this.configService.get<number>(
-      'RESERVATION_EXPIRATION_TIME',
-      30000,
-    ));
+    this.reservationExpirationTime = Number(
+      this.configService.get<number>('RESERVATION_EXPIRATION_TIME', 30000),
+    );
   }
 
   async createReservation(dto: CreateReservationDto): Promise<Reservation[]> {
@@ -74,11 +73,15 @@ export class ReservationService {
           .getOne();
 
         if (!seat) {
-          throw new NotFoundException(`Assento ${seatNumber} não existe nesta sessão.`);
+          throw new NotFoundException(
+            `Assento ${seatNumber} não existe nesta sessão.`,
+          );
         }
 
         if (seat.status !== SeatStatus.AVAILABLE) {
-          throw new ConflictException(`O assento ${seatNumber} já está reservado/vendido.`);
+          throw new ConflictException(
+            `O assento ${seatNumber} já está reservado/vendido.`,
+          );
         }
 
         // Atualiza status do assento
@@ -112,7 +115,6 @@ export class ReservationService {
       // 4. Efetiva a transação
       await queryRunner.commitTransaction();
 
-      
       // Enviar eventos Kafka
       for (const reservation of reservations) {
         await this.kafkaProducer.produce(KAFKA_TOPICS.RESERVATION_CREATED, {
@@ -134,17 +136,24 @@ export class ReservationService {
       return reservations;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      
-      // Tratamento de Idempotência 
-      if (error.code === '23505') { 
-        this.logger.warn(`Requisição duplicada ignorada: ${dto.idempotency_key}`);
-        throw new ConflictException('Esta reserva já foi processada anteriormente.');
+
+      // Tratamento de Idempotência
+      if (error.code === '23505') {
+        this.logger.warn(
+          `Requisição duplicada ignorada: ${dto.idempotency_key}`,
+        );
+        throw new ConflictException(
+          'Esta reserva já foi processada anteriormente.',
+        );
       }
 
       this.logger.error('Erro ao processar reserva', error);
-      
+
       // Repassa erros conhecidos, caso contrário lança BadRequest
-      if (error instanceof ConflictException || error instanceof NotFoundException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new BadRequestException('Erro interno ao processar reserva.');
@@ -161,11 +170,11 @@ export class ReservationService {
     await queryRunner.startTransaction();
 
     try {
-      // Busca a reserva 
+      // Busca a reserva
       const reservation = await queryRunner.manager
         .createQueryBuilder(Reservation, 'reservation')
-        .setLock('pessimistic_write') 
-        .innerJoinAndSelect('reservation.session', 'session') 
+        .setLock('pessimistic_write')
+        .innerJoinAndSelect('reservation.session', 'session')
         .innerJoinAndSelect('reservation.seat', 'seat')
         .where('reservation.id = :id', { id: dto.reservation_id })
         .getOne();
@@ -175,7 +184,9 @@ export class ReservationService {
       }
 
       if (reservation.status !== ReservationStatus.PENDING) {
-        throw new BadRequestException(`Reserva não está pendente (Status: ${reservation.status})`);
+        throw new BadRequestException(
+          `Reserva não está pendente (Status: ${reservation.status})`,
+        );
       }
 
       if (new Date() > reservation.expires_at) {
@@ -187,7 +198,9 @@ export class ReservationService {
       await queryRunner.manager.save(reservation);
 
       // Atualiza status do assento para VENDIDO
-      const seat = await queryRunner.manager.findOne(Seat, { where: { id: reservation.seat_id } });
+      const seat = await queryRunner.manager.findOne(Seat, {
+        where: { id: reservation.seat_id },
+      });
       if (seat) {
         seat.status = SeatStatus.SOLD;
         await queryRunner.manager.save(seat);
@@ -215,7 +228,7 @@ export class ReservationService {
       });
 
       await this.cacheService.delPattern(`*${reservation.session_id}*`);
-      
+
       return savedSale;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -233,7 +246,7 @@ export class ReservationService {
         status: ReservationStatus.PENDING,
         expires_at: LessThan(new Date()),
       },
-      take: 50, 
+      take: 50,
     });
 
     if (expiredReservations.length === 0) return;
@@ -251,13 +264,20 @@ export class ReservationService {
         await queryRunner.manager.save(reservation);
 
         // Libera o assento
-        const seat = await queryRunner.manager.findOne(Seat, { where: { id: reservation.seat_id } });
+        const seat = await queryRunner.manager.findOne(Seat, {
+          where: { id: reservation.seat_id },
+        });
         if (seat && seat.status === SeatStatus.RESERVED) {
           seat.status = SeatStatus.AVAILABLE;
           await queryRunner.manager.save(seat);
-          
+
           // Devolve para o pool de disponíveis
-          await queryRunner.manager.increment(Session, { id: reservation.session_id }, 'available_seats', 1);
+          await queryRunner.manager.increment(
+            Session,
+            { id: reservation.session_id },
+            'available_seats',
+            1,
+          );
         }
 
         await queryRunner.commitTransaction();
@@ -267,7 +287,6 @@ export class ReservationService {
           reservation_id: reservation.id,
           seat_id: reservation.seat_id,
         });
-
       } catch (error) {
         await queryRunner.rollbackTransaction();
         this.logger.error(`Falha ao expirar reserva ${reservation.id}`, error);
@@ -275,10 +294,10 @@ export class ReservationService {
         await queryRunner.release();
       }
     }
-    
+
     // Limpa cache uma vez por lote, se necessário
     if (expiredReservations.length > 0) {
-       // Opcional: invalidar caches específicos se soubermos os IDs das sessões
+      // Opcional: invalidar caches específicos se soubermos os IDs das sessões
     }
   }
 
@@ -296,51 +315,60 @@ export class ReservationService {
     await queryRunner.startTransaction();
 
     try {
-        // Busca para evitar condições de corrida no cancelamento
-        const reservation = await queryRunner.manager.findOne(Reservation, {
+      // Busca para evitar condições de corrida no cancelamento
+      const reservation = await queryRunner.manager.findOne(Reservation, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
-        });
+      });
 
-        if (!reservation) {
+      if (!reservation) {
         throw new NotFoundException('Reserva não encontrada.');
-        }
+      }
 
-        if (reservation.status !== ReservationStatus.PENDING) {
-        throw new BadRequestException('Apenas reservas pendentes podem ser canceladas.');
-        }
+      if (reservation.status !== ReservationStatus.PENDING) {
+        throw new BadRequestException(
+          'Apenas reservas pendentes podem ser canceladas.',
+        );
+      }
 
-        // 1. Atualiza status da reserva
-        reservation.status = ReservationStatus.CANCELLED;
-        await queryRunner.manager.save(reservation);
+      // 1. Atualiza status da reserva
+      reservation.status = ReservationStatus.CANCELLED;
+      await queryRunner.manager.save(reservation);
 
-        // 2. Libera o assento
-        const seat = await queryRunner.manager.findOne(Seat, { where: { id: reservation.seat_id } });
-        if (seat) {
+      // 2. Libera o assento
+      const seat = await queryRunner.manager.findOne(Seat, {
+        where: { id: reservation.seat_id },
+      });
+      if (seat) {
         seat.status = SeatStatus.AVAILABLE;
         await queryRunner.manager.save(seat);
-        }
+      }
 
-        // 3. Devolve para o pool da sessão
-        await queryRunner.manager.increment(Session, { id: reservation.session_id }, 'available_seats', 1);
+      // 3. Devolve para o pool da sessão
+      await queryRunner.manager.increment(
+        Session,
+        { id: reservation.session_id },
+        'available_seats',
+        1,
+      );
 
-        await queryRunner.commitTransaction();
+      await queryRunner.commitTransaction();
 
-        // 4. Notifica e Limpa Cache
-        await this.kafkaProducer.produce(KAFKA_TOPICS.SEAT_RELEASED, {
+      // 4. Notifica e Limpa Cache
+      await this.kafkaProducer.produce(KAFKA_TOPICS.SEAT_RELEASED, {
         reservation_id: reservation.id,
         seat_id: reservation.seat_id,
-        reason: 'manual_cancellation'
-        });
-        
-        await this.cacheService.delPattern(`*${reservation.session_id}*`);
+        reason: 'manual_cancellation',
+      });
 
-        this.logger.log(`Reserva ${id} cancelada manualmente.`);
+      await this.cacheService.delPattern(`*${reservation.session_id}*`);
+
+      this.logger.log(`Reserva ${id} cancelada manualmente.`);
     } catch (error) {
-        await queryRunner.rollbackTransaction();
-        throw error;
+      await queryRunner.rollbackTransaction();
+      throw error;
     } finally {
-        await queryRunner.release();
+      await queryRunner.release();
     }
- }
+  }
 }

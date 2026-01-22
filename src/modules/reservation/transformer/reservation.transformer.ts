@@ -11,7 +11,7 @@ export class ReservationTransformer {
       userId: reservation.user_id,
       sessionId: reservation.session_id,
       status: reservation.status,
-      seatNumber: reservation.seat?.seat_number || 'N/A', 
+      seatNumber: reservation.seat?.seat_number || 'N/A',
       expiresAt: reservation.expires_at,
       createdAt: reservation.created_at,
     };
@@ -27,7 +27,7 @@ export class ReservationTransformer {
       status: 'COMPLETED',
       price: Number(sale.price),
       paymentId: sale.payment_id,
-      ticketCode: sale.id.split('-')[0].toUpperCase(), 
+      ticketCode: sale.id.split('-')[0].toUpperCase(),
       purchasedAt: sale.created_at,
     };
   }

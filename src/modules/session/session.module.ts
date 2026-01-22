@@ -8,15 +8,9 @@ import { CacheModule } from '../cache/cache.module';
 import { SessionTransformer } from './transformer/session.transformer';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Session, Seat]),
-    CacheModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Session, Seat]), CacheModule],
   controllers: [SessionController],
-  providers: [
-    SessionService, 
-    SessionTransformer 
-  ],
+  providers: [SessionService, SessionTransformer],
   exports: [SessionService],
 })
 export class SessionModule {}

@@ -1,9 +1,9 @@
 import { Module, Global } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { KafkaProducerService } from './producers/kafka.producer';
-import { KafkaConsumerController } from './kafka.consumer.controller'; 
+import { KafkaConsumerController } from './kafka.consumer.controller';
 
-@Global() 
+@Global()
 @Module({
   imports: [
     ClientsModule.register([

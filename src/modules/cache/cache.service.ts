@@ -43,7 +43,9 @@ export class CacheService {
           await store.del(keys);
         }
       } else {
-        this.logger.warn(`O store de cache atual não suporta a operação 'keys' ou não foi encontrado.`);
+        this.logger.warn(
+          `O store de cache atual não suporta a operação 'keys' ou não foi encontrado.`,
+        );
       }
     } catch (error) {
       this.logger.error(`Erro ao deletar padrão ${pattern}`, error);

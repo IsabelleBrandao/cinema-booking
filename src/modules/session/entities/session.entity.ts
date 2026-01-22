@@ -34,7 +34,7 @@ export class Session {
   @Column()
   end_time: Date;
 
-  @ApiProperty({ example: 45.50 })
+  @ApiProperty({ example: 45.5 })
   @Column('decimal', { precision: 10, scale: 2 })
   ticket_price: number;
 

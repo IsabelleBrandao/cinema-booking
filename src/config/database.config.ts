@@ -8,7 +8,13 @@ dotenv.config({ path: envPath });
 const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 const entitiesPath = path.join(__dirname, '..', '**', '*.entity{.ts,.js}');
-const migrationsPath = path.join(__dirname, '..', 'database', 'migrations', '*{.ts,.js}');
+const migrationsPath = path.join(
+  __dirname,
+  '..',
+  'database',
+  'migrations',
+  '*{.ts,.js}',
+);
 
 export const databaseConfig: DataSourceOptions = {
   type: 'postgres',
@@ -17,14 +23,12 @@ export const databaseConfig: DataSourceOptions = {
   username: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  
+
   entities: [normalizePath(entitiesPath)],
   migrations: [normalizePath(migrationsPath)],
-  
-  // 👇 AQUI ESTÁ O SEGREDO:
-  migrationsRun: true, // Roda as migrações automaticamente no boot
-  
-  synchronize: false, // Mantenha false para usar migrations corretamente
+  migrationsRun: true, 
+
+  synchronize: false, 
   logging: process.env.NODE_ENV === 'development',
 };
 

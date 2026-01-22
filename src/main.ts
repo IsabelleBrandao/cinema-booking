@@ -11,7 +11,7 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug'],
   });
 
-  // KAFKA 
+  // KAFKA
   app.connectMicroservice(kafkaConfig);
   await app.startAllMicroservices();
 
@@ -29,7 +29,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Sistema de Reserva de Ingressos (Cinema Booking)')
     .setDescription(
-      'API distribuída com controle de concorrência, Redis e Kafka.'
+      'API distribuída com controle de concorrência, Redis e Kafka.',
     )
     .setVersion('1.0')
     .addTag('Sessões')

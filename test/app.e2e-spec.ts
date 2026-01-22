@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest'; 
+import request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { randomUUID } from 'crypto';
 import { ReservationResponseDto } from '../src/modules/reservation/dto/reservation-response.dto';
 
 describe('Cinema Booking System (e2e)', () => {
   let app: INestApplication;
-  let sessionId: string; 
+  let sessionId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -15,13 +15,15 @@ describe('Cinema Booking System (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }));
-    
+
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
     await app.init();
   });
 
@@ -36,7 +38,7 @@ describe('Cinema Booking System (e2e)', () => {
         .send({
           movie_name: 'Test Movie E2E',
           room_name: 'Room 1',
-          start_time: new Date(Date.now() + 86400000).toISOString(), 
+          start_time: new Date(Date.now() + 86400000).toISOString(),
           end_time: new Date(Date.now() + 90000000).toISOString(),
           ticket_price: 25.0,
           total_seats: 20,
@@ -46,7 +48,7 @@ describe('Cinema Booking System (e2e)', () => {
       expect(response.body).toHaveProperty('id');
       expect(response.body.movieName).toBe('Test Movie E2E');
       expect(response.body.availableSeats).toBe(20);
-      
+
       sessionId = response.body.id;
     });
 
@@ -66,7 +68,7 @@ describe('Cinema Booking System (e2e)', () => {
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(20);
-      
+
       expect(response.body[0]).toHaveProperty('seatNumber');
       expect(response.body[0]).toHaveProperty('status');
       expect(response.body[0].status).toBe('available');
@@ -90,9 +92,9 @@ describe('Cinema Booking System (e2e)', () => {
 
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(2);
-      
+
       const body = response.body as ReservationResponseDto[];
-      const resA1 = body.find(r => r.seatNumber === 'A1');
+      const resA1 = body.find((r) => r.seatNumber === 'A1');
 
       expect(resA1).toBeDefined();
       expect(resA1!.status).toBe('pending');
@@ -103,7 +105,7 @@ describe('Cinema Booking System (e2e)', () => {
 
     it('POST /reservations - deve bloquear reserva duplicada (concorrência/idempotência)', async () => {
       const userId = randomUUID();
-      
+
       await request(app.getHttpServer())
         .post('/reservations')
         .send({
@@ -112,7 +114,7 @@ describe('Cinema Booking System (e2e)', () => {
           seat_numbers: ['A1'],
           idempotency_key: `e2e-test-conflict-${Date.now()}`,
         })
-        .expect(409); 
+        .expect(409);
     });
   });
 });

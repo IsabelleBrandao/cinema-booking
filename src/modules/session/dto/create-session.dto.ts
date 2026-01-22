@@ -46,7 +46,7 @@ export class CreateSessionDto {
 
   @ApiProperty({
     description: 'Preço do ingresso em Reais (R$)',
-    example: 45.50,
+    example: 45.5,
     minimum: 0,
   })
   @IsNumber({ maxDecimalPlaces: 2 })

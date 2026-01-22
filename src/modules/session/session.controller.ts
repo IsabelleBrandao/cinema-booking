@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from './dto/create-session.dto';
@@ -23,9 +31,12 @@ export class SessionController {
   @ApiResponse({
     status: 201,
     description: 'Sessão criada com sucesso.',
-    type: SessionResponseDto, 
+    type: SessionResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Erro de validação (ex: data final < inicial)' })
+  @ApiResponse({
+    status: 400,
+    description: 'Erro de validação (ex: data final < inicial)',
+  })
   async create(@Body() createSessionDto: CreateSessionDto) {
     const session = await this.sessionService.createSession(createSessionDto);
     return this.sessionTransformer.toResponse(session);
@@ -36,7 +47,7 @@ export class SessionController {
   @ApiResponse({
     status: 200,
     description: 'Lista recuperada com sucesso',
-    type: [SessionResponseDto], 
+    type: [SessionResponseDto],
   })
   async findAll() {
     const sessions = await this.sessionService.findAllSessions();
@@ -53,14 +64,15 @@ export class SessionController {
   }
 
   @Get(':id/seats')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Buscar assentos disponíveis em tempo real',
-    description: 'Retorna apenas os assentos com status AVAILABLE. Usa cache Redis.' 
+    description:
+      'Retorna apenas os assentos com status AVAILABLE. Usa cache Redis.',
   })
   @ApiResponse({
     status: 200,
     description: 'Lista de assentos disponíveis',
-    type: [SeatResponseDto], 
+    type: [SeatResponseDto],
   })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
   async getAvailableSeats(@Param('id') id: string) {

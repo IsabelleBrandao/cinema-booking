@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, Delete, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Delete,
+  Param,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ReservationService } from './reservation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -11,19 +20,20 @@ import { ReservationResponseDto } from './dto/reservation-response.dto';
 export class ReservationController {
   constructor(
     private readonly reservationService: ReservationService,
-    private readonly transformer: ReservationTransformer, 
+    private readonly transformer: ReservationTransformer,
   ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Reservar assentos',
-    description: 'Bloqueia os assentos temporariamente (30s). Exige confirmação de pagamento posterior.',
+    description:
+      'Bloqueia os assentos temporariamente (30s). Exige confirmação de pagamento posterior.',
   })
   @ApiResponse({
     status: 201,
     description: 'Reserva iniciada com sucesso. Aguardando pagamento.',
-    type: [ReservationResponseDto], 
+    type: [ReservationResponseDto],
   })
   @ApiResponse({
     status: 409,
@@ -37,8 +47,14 @@ export class ReservationController {
   @Post('confirm-payment')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Confirmar pagamento e finalizar venda' })
-  @ApiResponse({ status: 200, description: 'Venda confirmada e ingresso gerado.' })
-  @ApiResponse({ status: 404, description: 'Reserva não encontrada ou expirada.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Venda confirmada e ingresso gerado.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Reserva não encontrada ou expirada.',
+  })
   async confirmPayment(@Body() dto: ConfirmPaymentDto) {
     const sale = await this.reservationService.confirmPayment(dto);
     return this.transformer.toSaleResponse(sale);
@@ -60,7 +76,10 @@ export class ReservationController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cancelar uma reserva pendente manualmente' })
-  @ApiResponse({ status: 204, description: 'Reserva cancelada e assento liberado.' })
+  @ApiResponse({
+    status: 204,
+    description: 'Reserva cancelada e assento liberado.',
+  })
   async cancel(@Param('id') id: string) {
     await this.reservationService.cancelReservation(id);
   }

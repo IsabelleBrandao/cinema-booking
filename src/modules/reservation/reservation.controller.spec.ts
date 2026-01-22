@@ -16,7 +16,6 @@ describe('ReservationController', () => {
       cancelReservation: jest.fn(),
     };
 
-    // Mock simples do Transformer
     mockTransformer = {
       toResponseList: jest.fn((data) => data),
       toSaleResponse: jest.fn((data) => data),
@@ -29,7 +28,7 @@ describe('ReservationController', () => {
           provide: ReservationService,
           useValue: mockService,
         },
-        // Injeção do Transformer Mockado
+       
         {
           provide: ReservationTransformer,
           useValue: mockTransformer,

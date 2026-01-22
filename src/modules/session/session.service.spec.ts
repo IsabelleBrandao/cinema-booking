@@ -5,7 +5,7 @@ import { SessionService } from './session.service';
 import { Session } from './entities/session.entity';
 import { Seat, SeatStatus } from './entities/seat.entity';
 import { CacheService } from '../cache/cache.service';
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource } from 'typeorm';
 
 describe('SessionService', () => {
   let service: SessionService;
