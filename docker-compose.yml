@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: cinema-postgres
     environment:
       POSTGRES_USER: cinema_user
@@ -15,7 +15,7 @@ services:
     networks:
       - cinema-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cinema_user"]
+      test: ["CMD-SHELL", "pg_isready -U cinema_user -d cinema_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -76,7 +76,6 @@ services:
       retries: 5
 
   app:
-    # AQUI: Ajustado para pegar o Dockerfile da raiz
     build:
       context: .
       dockerfile: Dockerfile 

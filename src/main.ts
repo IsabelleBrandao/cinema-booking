@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { kafkaConfig } from './config/kafka.config';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -10,7 +11,10 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug'],
   });
 
-  // Pipes globais
+  // KAFKA
+  app.connectMicroservice(kafkaConfig);
+  await app.startAllMicroservices();
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,14 +23,13 @@ async function bootstrap() {
     }),
   );
 
-  // CORS
   app.enableCors();
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('Sistema de Reserva de Ingressos de Cinema')
+    .setTitle('Sistema de Reserva de Ingressos (Cinema Booking)')
     .setDescription(
-      'API para gerenciamento de sessões, reservas e vendas de ingressos com controle de concorrência',
+      'API distribuída com controle de concorrência, Redis e Kafka.',
     )
     .setVersion('1.0')
     .addTag('Sessões')
@@ -39,8 +42,8 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  logger.log(`🚀 Aplicação rodando na porta ${port}`);
-  logger.log(`📚 Documentação disponível em http://localhost:${port}/api-docs`);
+  logger.log(`Aplicação rodando na porta ${port}`);
+  logger.log(`Swagger disponível em http://localhost:${port}/api-docs`);
 }
 
 bootstrap();

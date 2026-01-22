@@ -34,48 +34,58 @@ export class SessionService {
     await queryRunner.startTransaction();
 
     try {
-      // Criar sessão
+      // 1. Validação de Lógica de Negócio
+      if (dto.end_time <= dto.start_time) {
+        throw new BadRequestException(
+          'A data de término deve ser posterior ao início.',
+        );
+      }
+
+      // 2. Criar a Sessão
       const session = this.sessionRepository.create({
-        movie_name: dto.movie_name,
-        room_name: dto.room_name,
-        start_time: new Date(dto.start_time),
-        end_time: new Date(dto.end_time),
-        ticket_price: dto.ticket_price,
-        total_seats: dto.total_seats,
+        ...dto,
         available_seats: dto.total_seats,
+        is_active: true,
       });
 
       const savedSession = await queryRunner.manager.save(session);
 
-      // Criar assentos
+      // 3. Gerar Assentos Automaticamente
+      // Lógica: Criar filas de 10 cadeiras (A1...A10, B1...B10)
       const seats: Seat[] = [];
-      const rows = Math.ceil(dto.total_seats / 4);
+      const seatsPerRow = 10;
+      const rows = Math.ceil(dto.total_seats / seatsPerRow);
 
-      let seatNumber = 0;
+      let seatCount = 0;
       for (let row = 0; row < rows; row++) {
-        const rowLetter = String.fromCharCode(65 + row); // A, B, C...
-        const seatsInRow = Math.min(4, dto.total_seats - seatNumber);
+        const rowLetter = String.fromCharCode(65 + row); // Converte 0->A, 1->B...
 
-        for (let col = 1; col <= seatsInRow; col++) {
+        // Na última fila, pode sobrar menos cadeiras
+        const seatsInCurrentRow = Math.min(
+          seatsPerRow,
+          dto.total_seats - seatCount,
+        );
+
+        for (let col = 1; col <= seatsInCurrentRow; col++) {
           const seat = this.seatRepository.create({
             session_id: savedSession.id,
-            seat_number: `${rowLetter}${col}`,
+            seat_number: `${rowLetter}${col}`, // Ex: A1, B5
             status: SeatStatus.AVAILABLE,
           });
           seats.push(seat);
-          seatNumber++;
+          seatCount++;
         }
       }
 
+      // Salva todos os assentos de uma vez
       await queryRunner.manager.save(seats);
+
+      // Confirma a transação no banco
       await queryRunner.commitTransaction();
 
       this.logger.log(
-        `Sessão criada com sucesso: ${savedSession.id} com ${seats.length} assentos`,
+        `Sessão ${savedSession.id} criada com ${seats.length} assentos.`,
       );
-
-      // Invalidar cache
-      await this.cacheService.del(`session:${savedSession.id}`);
 
       return savedSession;
     } catch (error) {
@@ -88,55 +98,28 @@ export class SessionService {
   }
 
   async findSessionById(sessionId: string): Promise<Session> {
-    // Tentar buscar do cache primeiro
     const cacheKey = `session:${sessionId}`;
-    const cached = await this.cacheService.get<Session>(cacheKey);
 
-    if (cached) {
-      this.logger.debug(`Sessão ${sessionId} retornada do cache`);
-      return cached;
+    // 1. Tenta pegar do Cache (Redis)
+    const cachedSession = await this.cacheService.get<Session>(cacheKey);
+    if (cachedSession) {
+      return cachedSession;
     }
 
+    // 2. Busca no Banco de Dados
     const session = await this.sessionRepository.findOne({
       where: { id: sessionId },
-      relations: ['seats'],
+      // Não trazemos os 'seats' aqui para economizar memória na listagem simples
     });
 
     if (!session) {
-      throw new NotFoundException(`Sessão ${sessionId} não encontrada`);
+      throw new NotFoundException('Sessão não encontrada');
     }
 
-    // Armazenar no cache
+    // 3. Salva no Cache por 5 minutos
     await this.cacheService.set(cacheKey, session, 300);
 
     return session;
-  }
-
-  async getAvailableSeats(sessionId: string): Promise<Seat[]> {
-    const cacheKey = `available-seats:${sessionId}`;
-    const cached = await this.cacheService.get<Seat[]>(cacheKey);
-
-    if (cached) {
-      this.logger.debug(
-        `Assentos disponíveis da sessão ${sessionId} retornados do cache`,
-      );
-      return cached;
-    }
-
-    const seats = await this.seatRepository.find({
-      where: {
-        session_id: sessionId,
-        status: SeatStatus.AVAILABLE,
-      },
-      order: {
-        seat_number: 'ASC',
-      },
-    });
-
-    // Cache por 10 segundos
-    await this.cacheService.set(cacheKey, seats, 10);
-
-    return seats;
   }
 
   async findAllSessions(): Promise<Session[]> {
@@ -144,5 +127,32 @@ export class SessionService {
       where: { is_active: true },
       order: { start_time: 'ASC' },
     });
+  }
+
+  async getAvailableSeats(sessionId: string): Promise<Seat[]> {
+    // Cache de curta duração (5s) para aguentar refresh frenético dos usuários
+    const cacheKey = `session:seats:${sessionId}`;
+
+    const cachedSeats = await this.cacheService.get<Seat[]>(cacheKey);
+    if (cachedSeats) {
+      return cachedSeats;
+    }
+
+    // Garante que a sessão existe
+    await this.findSessionById(sessionId);
+
+    const seats = await this.seatRepository.find({
+      where: {
+        session_id: sessionId,
+        status: SeatStatus.AVAILABLE,
+      },
+      order: {
+        seat_number: 'ASC', // A1, A2, B1...
+      },
+    });
+
+    await this.cacheService.set(cacheKey, seats, 5);
+
+    return seats;
   }
 }

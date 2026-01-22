@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsString,
-  IsDateString,
+  IsDate,
   IsNumber,
   Min,
   IsInt,
@@ -10,38 +11,42 @@ import {
 
 export class CreateSessionDto {
   @ApiProperty({
-    description: 'Nome do filme',
-    example: 'Vingadores: Ultimato',
+    description: 'Nome do filme em cartaz',
+    example: 'O Auto da Compadecida 2',
   })
   @IsString()
   @MinLength(1)
   movie_name: string;
 
   @ApiProperty({
-    description: 'Nome da sala',
-    example: 'Sala 1',
+    description: 'Sala onde será exibido',
+    example: 'Sala 3 (VIP)',
   })
   @IsString()
   @MinLength(1)
   room_name: string;
 
   @ApiProperty({
-    description: 'Data e hora de início da sessão',
-    example: '2026-01-25T19:00:00Z',
+    description: 'Data e hora de início (ISO 8601)',
+    example: '2026-02-20T19:00:00Z',
+    type: String,
   })
-  @IsDateString()
-  start_time: string;
+  @IsDate()
+  @Type(() => Date)
+  start_time: Date;
 
   @ApiProperty({
-    description: 'Data e hora de término da sessão',
-    example: '2026-01-25T21:30:00Z',
+    description: 'Data e hora de término',
+    example: '2026-02-20T21:00:00Z',
+    type: String,
   })
-  @IsDateString()
-  end_time: string;
+  @IsDate()
+  @Type(() => Date)
+  end_time: Date;
 
   @ApiProperty({
-    description: 'Preço do ingresso em reais',
-    example: 25.0,
+    description: 'Preço do ingresso em Reais (R$)',
+    example: 45.5,
     minimum: 0,
   })
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -49,8 +54,8 @@ export class CreateSessionDto {
   ticket_price: number;
 
   @ApiProperty({
-    description: 'Número de assentos (mínimo 16)',
-    example: 16,
+    description: 'Quantidade total de assentos (serão gerados automaticamente)',
+    example: 50,
     minimum: 16,
   })
   @IsInt()

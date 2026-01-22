@@ -1,55 +1,112 @@
-# Cinema Booking System (Desafio Backend)
+# Cinema Booking System (High Concurrency)
 
-Este projeto é uma solução para o desafio de desenvolvimento de um sistema de venda de ingressos distribuído, focado em alta concorrência e integridade de dados.
+Sistema de venda de ingressos distribuído, desenvolvido para suportar **alta concorrência**, garantir **consistência estrita** (ACID) e tolerância a falhas.
 
-## 📖 Visão Geral
+O projeto resolve problemas clássicos de sistemas distribuídos, como **Race Conditions**, **Deadlocks** e **Double Spending**.
 
-O sistema gerencia sessões de cinema, assentos e reservas, garantindo que **nenhum assento seja vendido duas vezes** mesmo sob alta carga. A arquitetura utiliza processamento assíncrono para reservas e pagamentos, desacoplando a experiência do usuário do processamento pesado.
+---
 
-## 🛠 Tecnologias Escolhidas
+## Diferenciais Implementados
 
-* **Node.js & NestJS**: Framework escolhido pela modularidade, injeção de dependência e facilidade em criar arquiteturas escaláveis e testáveis.
-* **PostgreSQL**: Banco de dados relacional robusto, essencial para garantir a propriedade ACID nas transações de vendas e integridade referencial das sessões.
-* **Redis**:
-    * *Cache*: Para consultas rápidas de disponibilidade de assentos.
-    * *Distributed Lock*: Para controle de concorrência (evitar Race Conditions) durante a reserva.
-* **Apache Kafka**: Escolhido (vs RabbitMQ) devido à sua capacidade de lidar com alto throughput de eventos e permitir *replay* de mensagens em caso de falhas críticas, garantindo que nenhuma venda seja perdida.
-* **Docker & Docker Compose**: Para orquestração do ambiente completo com um único comando.
+Além dos requisitos obrigatórios, este projeto inclui:
 
-## 🚀 Como Executar
+* **Rate Limiting:** Proteção contra ataques de força bruta/DDoS (limite de requisições por IP).
+* **Dead Letter Queue (DLQ):** Mensagens do Kafka que falham no processamento não são perdidas, garantindo observabilidade.
+* **Deadlock Prevention:** Ordenação determinística de recursos antes do travamento no banco.
+* **Idempotência:** Garantia de que uma mesma requisição de compra não seja processada duas vezes (chave de idempotência).
+* **Swagger/OpenAPI:** Documentação automática da API.
+* **Testes E2E:** Validação de fluxos completos de ponta a ponta.
+
+---
+
+## 🛠 Arquitetura e Tecnologias
+
+| Tecnologia | Função | Justificativa |
+| :--- | :--- | :--- |
+| **NestJS** | Backend Framework | Modularidade, Injeção de Dependência e suporte nativo a Microsserviços. |
+| **PostgreSQL** | Banco de Dados | Transações ACID e suporte a **Pessimistic Locking** (`SELECT ... FOR UPDATE`), essencial para evitar vendas duplicadas. |
+| **Redis** | Cache Distribuído | Implementação de *Cache-Aside* para leitura rápida de disponibilidade, reduzindo carga no banco. |
+| **Apache Kafka** | Mensageria | Processamento assíncrono para tarefas pesadas (envio de e-mail, geração de ticket), desacoplando o fluxo crítico. |
+| **Docker** | Infraestrutura | Orquestração de todos os serviços (App, DB, Cache, Broker) em um único comando. |
+
+---
+
+## Decisões de Design (O Desafio)
+
+### 1. O Problema da Concorrência (Race Condition)
+**Cenário:** Dois usuários tentam comprar o último assento exatamente ao mesmo tempo.
+**Solução:** Utilizamos **Pessimistic Write Lock** (`FOR UPDATE`) no banco de dados. Ao iniciar uma transação de reserva, o banco "trava" as linhas dos assentos solicitados. Qualquer outra transação concorrente é obrigada a aguardar a liberação, garantindo que o `status` do assento seja verificado e atualizado atomicamente.
+
+### 2. Prevenção de Deadlocks
+**Cenário:** Usuário A pede assentos [1, 2]. Usuário B pede [2, 1]. Se ambos travarem o primeiro item ao mesmo tempo, ocorrerá um Deadlock ao tentarem o segundo.
+**Solução:** Implementamos uma **ordenação prévia** dos IDs dos assentos antes de solicitar o bloqueio no banco. Assim, todas as transações sempre tentam adquirir recursos na mesma ordem (sempre 1 depois 2), eliminando a possibilidade de dependência circular.
+
+### 3. Consistência em Junções (TypeORM)
+**Desafio:** O PostgreSQL não permite `FOR UPDATE` em tabelas com *Nullable Side* (Left Joins).
+**Solução:** Forçamos o uso de `INNER JOIN` nas consultas críticas de pagamento, garantindo que o banco possa travar as linhas relacionadas com segurança.
+
+---
+
+## Como Executar
 
 ### Pré-requisitos
 * Docker e Docker Compose instalados.
-* Portas 3000, 5432, 6379 e 9092 livres.
 
 ### Passo a Passo
 
 1.  **Clone o repositório:**
     ```bash
-    git clone <SEU-LINK-DO-GITHUB>
-    cd cinema-booking-system
+    git clone [https://github.com/IsabelleBrandao/cinema-booking.git](https://github.com/IsabelleBrandao/cinema-booking.git)
+    cd cinema-booking
     ```
 
-2.  **Configure o ambiente:**
+2.  **Suba o ambiente:**
     ```bash
-    # Copie o arquivo de exemplo
-    cp .env.example .env
+    docker-compose up --build
     ```
 
-3.  **Inicie a aplicação:**
-    ```bash
-    # Este comando sobe API, Banco, Redis e Kafka
-    docker-compose up -d --build
-    ```
-    *Aguarde alguns instantes até que todos os serviços estejam saudáveis (healthy).*
+3.  **Aguarde a inicialização:**
+    O sistema estará pronto quando você vir os logs `Nest application successfully started`.
+    * **API:** `http://localhost:3000`
+    * **Swagger:** `http://localhost:3000/api-docs`
 
-4.  **Acesse a Documentação (Swagger):**
-    * Abra no navegador: `http://localhost:3000/api`
+---
 
-### Executando Testes (Futuro)
-```bash
-# Testes Unitários
-npm run test
+## Como Testar
 
-# Testes E2E (Integração)
-npm run test:e2e
+### 1. Via Swagger (Manual)
+Acesse [http://localhost:3000/api-docs](http://localhost:3000/api-docs).
+1.  Crie uma Sessão (`POST /sessions`).
+2.  Copie o ID da sessão.
+3.  Faça uma Reserva (`POST /reservations`).
+4.  Confirme o Pagamento (`POST /reservations/confirm-payment`).
+
+### 2. Teste de Concorrência (Script)
+Para validar a robustez do sistema, você pode simular requisições simultâneas.
+*Se 2 requisições tentarem reservar o mesmo assento ao mesmo tempo:*
+* Uma receberá **201 Created**.
+* A outra receberá **409 Conflict** (corretamente bloqueada).
+
+---
+
+## Endpoints Principais
+
+### Sessões
+* `POST /sessions` - Cria nova sessão (Filme, Sala, Horário).
+* `GET /sessions/:id/seats` - Busca mapa de assentos (com cache Redis).
+
+### Reservas
+* `POST /reservations` - Reserva assentos temporariamente (30s).
+* `POST /reservations/confirm-payment` - Confirma venda e dispara eventos Kafka.
+* `DELETE /reservations/:id` - Cancelamento manual (libera assento imediatamente).
+
+---
+
+## Melhorias Futuras
+
+* Implementar autenticação JWT/OAuth2.
+* Dashboard de monitoramento (Grafana/Prometheus) para métricas do Kafka.
+* Webhooks para notificação de parceiros externos.
+
+---
+**Desenvolvido por Isabelle Brandão** 

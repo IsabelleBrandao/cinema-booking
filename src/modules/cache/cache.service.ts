@@ -1,101 +1,54 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
-import { getRedisConfig } from '../../config/redis.config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 
 @Injectable()
-export class CacheService implements OnModuleDestroy {
+export class CacheService {
   private readonly logger = new Logger(CacheService.name);
-  private readonly redis: Redis;
-  private readonly defaultTTL: number;
 
-  constructor(private readonly configService: ConfigService) {
-    this.redis = new Redis(getRedisConfig(configService));
-    this.defaultTTL = this.configService.get<number>('REDIS_TTL', 1800);
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
-    this.redis.on('connect', () => {
-      this.logger.log('Conectado ao Redis com sucesso');
-    });
-
-    this.redis.on('error', (err) => {
-      this.logger.error('Erro na conexão com Redis', err);
-    });
-  }
-
-  async get<T>(key: string): Promise<T | null> {
+  async get<T>(key: string): Promise<T | undefined> {
     try {
-      const value = await this.redis.get(key);
-      return value ? JSON.parse(value) : null;
+      return await this.cacheManager.get<T>(key);
     } catch (error) {
-      this.logger.error(`Erro ao buscar chave ${key}`, error);
-      return null;
+      this.logger.error(`Erro ao buscar cache ${key}`, error);
+      return undefined;
     }
   }
 
-  async set(key: string, value: any, ttl?: number): Promise<void> {
+  async set(key: string, value: any, ttlSeconds = 600): Promise<void> {
     try {
-      const serialized = JSON.stringify(value);
-      const expiry = ttl || this.defaultTTL;
-      await this.redis.setex(key, expiry, serialized);
-      this.logger.debug(`Chave ${key} armazenada com TTL de ${expiry}s`);
+      await this.cacheManager.set(key, value, ttlSeconds);
     } catch (error) {
-      this.logger.error(`Erro ao armazenar chave ${key}`, error);
+      this.logger.error(`Erro ao salvar cache ${key}`, error);
     }
   }
 
   async del(key: string): Promise<void> {
     try {
-      await this.redis.del(key);
-      this.logger.debug(`Chave ${key} removida do cache`);
+      await this.cacheManager.del(key);
     } catch (error) {
-      this.logger.error(`Erro ao remover chave ${key}`, error);
+      this.logger.error(`Erro ao deletar cache ${key}`, error);
     }
   }
 
   async delPattern(pattern: string): Promise<void> {
     try {
-      const keys = await this.redis.keys(pattern);
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        this.logger.debug(
-          `${keys.length} chaves removidas com padrão ${pattern}`,
+      const store = (this.cacheManager as any).store;
+
+      if (store && typeof store.keys === 'function') {
+        const keys = await store.keys(pattern);
+        if (keys && keys.length > 0) {
+          await store.del(keys);
+        }
+      } else {
+        this.logger.warn(
+          `O store de cache atual não suporta a operação 'keys' ou não foi encontrado.`,
         );
       }
     } catch (error) {
-      this.logger.error(`Erro ao remover padrão ${pattern}`, error);
+      this.logger.error(`Erro ao deletar padrão ${pattern}`, error);
     }
-  }
-
-  async acquireLock(
-    key: string,
-    ttl: number = 10,
-  ): Promise<boolean> {
-    try {
-      const result = await this.redis.set(
-        `lock:${key}`,
-        '1',
-        'EX',
-        ttl,
-        'NX',
-      );
-      return result === 'OK';
-    } catch (error) {
-      this.logger.error(`Erro ao adquirir lock ${key}`, error);
-      return false;
-    }
-  }
-
-  async releaseLock(key: string): Promise<void> {
-    try {
-      await this.redis.del(`lock:${key}`);
-      this.logger.debug(`Lock ${key} liberado`);
-    } catch (error) {
-      this.logger.error(`Erro ao liberar lock ${key}`, error);
-    }
-  }
-
-  onModuleDestroy() {
-    this.redis.disconnect();
-    this.logger.log('Conexão com Redis encerrada');
   }
 }
