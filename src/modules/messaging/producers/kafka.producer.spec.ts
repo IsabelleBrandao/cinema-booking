@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ClientKafka } from '@nestjs/microservices';
 import { of, throwError } from 'rxjs';
 import { KafkaProducerService } from './kafka.producer';
 

@@ -11,10 +11,9 @@ async function bootstrap() {
     logger: ['error', 'warn', 'log', 'debug'],
   });
 
-  // --- ATIVANDO CONSUMIDOR KAFKA ---
+  // KAFKA 
   app.connectMicroservice(kafkaConfig);
   await app.startAllMicroservices();
-  // ---------------------------------
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -26,7 +25,7 @@ async function bootstrap() {
 
   app.enableCors();
 
-  // Configuração Sênior do Swagger
+  // Swagger
   const config = new DocumentBuilder()
     .setTitle('Sistema de Reserva de Ingressos (Cinema Booking)')
     .setDescription(

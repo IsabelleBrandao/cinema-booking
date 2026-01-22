@@ -37,18 +37,18 @@ export class ReservationService {
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
   ) {
-    this.reservationExpirationTime = this.configService.get<number>(
+    this.reservationExpirationTime = Number(this.configService.get<number>(
       'RESERVATION_EXPIRATION_TIME',
-      30000, // 30 segundos padrão
-    );
+      30000,
+    ));
   }
 
   async createReservation(dto: CreateReservationDto): Promise<Reservation[]> {
     this.logger.log(`Iniciando reserva: ${dto.idempotency_key}`);
 
+    dto.seat_numbers.sort();
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
-    // READ COMMITTED é o ideal para evitar Deadlocks quando usamos Pessimistic Write
     await queryRunner.startTransaction('READ COMMITTED');
 
     try {
@@ -66,8 +66,6 @@ export class ReservationService {
 
       // 2. Loop para reservar cada assento
       for (const seatNumber of dto.seat_numbers) {
-        // --- LOCK PESSIMISTA (O Coração da Concorrência) ---
-        // "Trava" a linha do assento no banco. Ninguém mais lê ou escreve até o commit.
         const seat = await queryRunner.manager
           .createQueryBuilder(Seat, 'seat')
           .setLock('pessimistic_write')
@@ -99,6 +97,7 @@ export class ReservationService {
         });
 
         const savedReservation = await queryRunner.manager.save(reservation);
+        savedReservation.seat = seat;
         reservations.push(savedReservation);
       }
 
@@ -113,7 +112,6 @@ export class ReservationService {
       // 4. Efetiva a transação
       await queryRunner.commitTransaction();
 
-      // --- Pós-Commit (Efeitos Colaterais) ---
       
       // Enviar eventos Kafka
       for (const reservation of reservations) {
@@ -135,10 +133,9 @@ export class ReservationService {
 
       return reservations;
     } catch (error) {
-      // Se der erro, desfaz tudo
       await queryRunner.rollbackTransaction();
       
-      // Tratamento de Idempotência (Erro de Unique Constraint do Postgres)
+      // Tratamento de Idempotência 
       if (error.code === '23505') { 
         this.logger.warn(`Requisição duplicada ignorada: ${dto.idempotency_key}`);
         throw new ConflictException('Esta reserva já foi processada anteriormente.');
@@ -164,12 +161,14 @@ export class ReservationService {
     await queryRunner.startTransaction();
 
     try {
-      // Busca a reserva com lock para garantir que não expire durante o pagamento
-      const reservation = await queryRunner.manager.findOne(Reservation, {
-        where: { id: dto.reservation_id },
-        relations: ['session', 'seat'],
-        lock: { mode: 'pessimistic_write' }, // Garante exclusividade
-      });
+      // Busca a reserva 
+      const reservation = await queryRunner.manager
+        .createQueryBuilder(Reservation, 'reservation')
+        .setLock('pessimistic_write') 
+        .innerJoinAndSelect('reservation.session', 'session') 
+        .innerJoinAndSelect('reservation.seat', 'seat')
+        .where('reservation.id = :id', { id: dto.reservation_id })
+        .getOne();
 
       if (!reservation) {
         throw new NotFoundException('Reserva não encontrada');
@@ -234,7 +233,7 @@ export class ReservationService {
         status: ReservationStatus.PENDING,
         expires_at: LessThan(new Date()),
       },
-      take: 50, // Processa em lotes para não travar o banco
+      take: 50, 
     });
 
     if (expiredReservations.length === 0) return;
@@ -290,4 +289,58 @@ export class ReservationService {
       order: { created_at: 'DESC' },
     });
   }
+
+  async cancelReservation(id: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+        // Busca para evitar condições de corrida no cancelamento
+        const reservation = await queryRunner.manager.findOne(Reservation, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!reservation) {
+        throw new NotFoundException('Reserva não encontrada.');
+        }
+
+        if (reservation.status !== ReservationStatus.PENDING) {
+        throw new BadRequestException('Apenas reservas pendentes podem ser canceladas.');
+        }
+
+        // 1. Atualiza status da reserva
+        reservation.status = ReservationStatus.CANCELLED;
+        await queryRunner.manager.save(reservation);
+
+        // 2. Libera o assento
+        const seat = await queryRunner.manager.findOne(Seat, { where: { id: reservation.seat_id } });
+        if (seat) {
+        seat.status = SeatStatus.AVAILABLE;
+        await queryRunner.manager.save(seat);
+        }
+
+        // 3. Devolve para o pool da sessão
+        await queryRunner.manager.increment(Session, { id: reservation.session_id }, 'available_seats', 1);
+
+        await queryRunner.commitTransaction();
+
+        // 4. Notifica e Limpa Cache
+        await this.kafkaProducer.produce(KAFKA_TOPICS.SEAT_RELEASED, {
+        reservation_id: reservation.id,
+        seat_id: reservation.seat_id,
+        reason: 'manual_cancellation'
+        });
+        
+        await this.cacheService.delPattern(`*${reservation.session_id}*`);
+
+        this.logger.log(`Reserva ${id} cancelada manualmente.`);
+    } catch (error) {
+        await queryRunner.rollbackTransaction();
+        throw error;
+    } finally {
+        await queryRunner.release();
+    }
+ }
 }

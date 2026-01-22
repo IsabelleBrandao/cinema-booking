@@ -21,18 +21,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | object = 'Internal server error';
 
-    // 1. Trata erros conhecidos da nossa aplicação
     if (exception instanceof AppError) {
       status = exception.statusCode;
       message = exception.message;
     }
-    // 2. Trata erros nativos do NestJS (ex: ValidationPipe, 404)
+
     else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
       message = typeof res === 'string' ? res : (res as any).message || res;
     }
-    // 3. Loga erros desconhecidos (bugs reais) para monitoramento
+
     else {
       this.logger.error(`Error processing request ${request.url}`, exception);
     }

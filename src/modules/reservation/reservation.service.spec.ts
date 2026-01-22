@@ -18,8 +18,18 @@ import { DataSource } from 'typeorm';
 describe('ReservationService', () => {
   let service: ReservationService;
   let mockQueryRunner: any;
+  let mockQueryBuilder: any; // 1. Variável para segurar a instância do QueryBuilder
 
   beforeEach(async () => {
+    // 2. Criamos o objeto FIXO do QueryBuilder
+    mockQueryBuilder = {
+      setLock: jest.fn().mockReturnThis(),
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
     mockQueryRunner = {
       connect: jest.fn(),
       startTransaction: jest.fn(),
@@ -31,12 +41,8 @@ describe('ReservationService', () => {
         save: jest.fn(),
         increment: jest.fn(),
         decrement: jest.fn(),
-        createQueryBuilder: jest.fn(() => ({
-          setLock: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn(),
-        })),
+        // 3. Retornamos sempre a mesma instância
+        createQueryBuilder: jest.fn(() => mockQueryBuilder),
       },
     };
 
@@ -111,9 +117,8 @@ describe('ReservationService', () => {
         seat_number: 'A1',
       };
 
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .getOne.mockResolvedValue(mockSeat);
+      // 4. Configuramos o retorno no objeto fixo
+      mockQueryBuilder.getOne.mockResolvedValue(mockSeat);
 
       mockQueryRunner.manager.save.mockImplementation((entity) =>
         Promise.resolve({ ...entity, id: 'new-id' }),
@@ -156,9 +161,7 @@ describe('ReservationService', () => {
         seat_number: 'A1',
       };
 
-      mockQueryRunner.manager
-        .createQueryBuilder()
-        .getOne.mockResolvedValue(mockSeat);
+      mockQueryBuilder.getOne.mockResolvedValue(mockSeat);
 
       await expect(service.createReservation(dto)).rejects.toThrow(
         ConflictException,
@@ -177,6 +180,15 @@ describe('ReservationService', () => {
       duplicateError.code = '23505';
 
       mockQueryRunner.manager.findOne.mockResolvedValueOnce({ id: 'session-1' });
+      
+      const mockSeat = {
+        id: 'seat-1',
+        status: SeatStatus.AVAILABLE,
+        seat_number: 'A1',
+      };
+      
+      mockQueryBuilder.getOne.mockResolvedValue(mockSeat);
+
       mockQueryRunner.manager.save.mockRejectedValueOnce(duplicateError);
 
       await expect(service.createReservation(dto)).rejects.toThrow(
@@ -196,29 +208,46 @@ describe('ReservationService', () => {
         id: 'res-1',
         status: ReservationStatus.PENDING,
         expires_at: new Date(Date.now() + 60000),
-        session: { ticket_price: 25.0 },
+        session: { ticket_price: 25.0, id: 'session-1' },
         user_id: 'user-1',
         session_id: 'session-1',
         seat_id: 'seat-1',
       };
 
-      mockQueryRunner.manager.findOne
-        .mockResolvedValueOnce(mockReservation)
-        .mockResolvedValueOnce({ id: 'seat-1' });
+      mockQueryBuilder.getOne.mockResolvedValue(mockReservation);
 
-      mockQueryRunner.manager.save.mockResolvedValue({});
+      // Mock do findOne para o assento (chamado após salvar reserva)
+      mockQueryRunner.manager.findOne.mockResolvedValue({ id: 'seat-1' });
+
+      mockQueryRunner.manager.save.mockResolvedValue({ id: 'sale-1', price: 25.0 });
 
       const result = await service.confirmPayment(dto);
 
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(result).toBeDefined();
     });
+
+    it('deve lançar erro se reserva não encontrada', async () => {
+        const dto = { reservation_id: 'res-1' };
+  
+        // Retorna null no getOne
+        mockQueryBuilder.getOne.mockResolvedValue(null);
+  
+        await expect(service.confirmPayment(dto)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
 
     it('deve lançar erro se reserva não está pendente', async () => {
       const dto = { reservation_id: 'res-1' };
 
-      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+      const mockReservation = {
+        id: 'res-1',
         status: ReservationStatus.CONFIRMED,
-      });
+        expires_at: new Date(Date.now() + 60000),
+      };
+
+      mockQueryBuilder.getOne.mockResolvedValue(mockReservation);
 
       await expect(service.confirmPayment(dto)).rejects.toThrow(
         BadRequestException,
@@ -228,10 +257,13 @@ describe('ReservationService', () => {
     it('deve lançar erro se reserva expirou', async () => {
       const dto = { reservation_id: 'res-1' };
 
-      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+      const mockReservation = {
+        id: 'res-1',
         status: ReservationStatus.PENDING,
-        expires_at: new Date(Date.now() - 10000),
-      });
+        expires_at: new Date(Date.now() - 10000), // Já expirou
+      };
+
+      mockQueryBuilder.getOne.mockResolvedValue(mockReservation);
 
       await expect(service.confirmPayment(dto)).rejects.toThrow(
         BadRequestException,

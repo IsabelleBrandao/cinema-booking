@@ -17,7 +17,6 @@ export class CacheService {
     }
   }
 
-  // ⚠️ CORREÇÃO: TTL em SEGUNDOS (padrão do Redis)
   async set(key: string, value: any, ttlSeconds = 600): Promise<void> {
     try {
       await this.cacheManager.set(key, value, ttlSeconds);
@@ -37,11 +36,14 @@ export class CacheService {
   async delPattern(pattern: string): Promise<void> {
     try {
       const store = (this.cacheManager as any).store;
-      if (store.keys) {
+
+      if (store && typeof store.keys === 'function') {
         const keys = await store.keys(pattern);
-        if (keys.length > 0) {
+        if (keys && keys.length > 0) {
           await store.del(keys);
         }
+      } else {
+        this.logger.warn(`O store de cache atual não suporta a operação 'keys' ou não foi encontrado.`);
       }
     } catch (error) {
       this.logger.error(`Erro ao deletar padrão ${pattern}`, error);

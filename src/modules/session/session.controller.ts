@@ -1,9 +1,10 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import { CreateSessionDto } from './dto/create-session.dto';
-import { Session } from './entities/session.entity';
 import { SessionTransformer } from './transformer/session.transformer';
+import { SessionResponseDto } from './dto/session-response.dto';
+import { SeatResponseDto } from './dto/seat-response.dto';
 
 @ApiTags('Sessões')
 @Controller('sessions')
@@ -14,18 +15,20 @@ export class SessionController {
   ) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Criar uma nova sessão',
-    description: 'Cria a sessão e gera automaticamente a matriz de assentos (A1, A2...) no banco.',
+    description: 'Cria a sessão e gera automaticamente a matriz de assentos.',
   })
   @ApiResponse({
     status: 201,
     description: 'Sessão criada com sucesso.',
-    type: Session, 
+    type: SessionResponseDto, 
   })
   @ApiResponse({ status: 400, description: 'Erro de validação (ex: data final < inicial)' })
-  create(@Body() createSessionDto: CreateSessionDto) {
-    return this.sessionService.createSession(createSessionDto);
+  async create(@Body() createSessionDto: CreateSessionDto) {
+    const session = await this.sessionService.createSession(createSessionDto);
+    return this.sessionTransformer.toResponse(session);
   }
 
   @Get()
@@ -33,23 +36,22 @@ export class SessionController {
   @ApiResponse({
     status: 200,
     description: 'Lista recuperada com sucesso',
-    type: [Session],
+    type: [SessionResponseDto], 
   })
-  findAll() {
-    return this.sessionService.findAllSessions();
+  async findAll() {
+    const sessions = await this.sessionService.findAllSessions();
+    return this.sessionTransformer.toResponseList(sessions);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Buscar detalhes da sessão' })
-  @ApiResponse({ status: 200, type: Session })
+  @ApiResponse({ status: 200, type: SessionResponseDto })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  findOne(@Param('id') id: string) {
-    return this.sessionService.findSessionById(id);
+  async findOne(@Param('id') id: string) {
+    const session = await this.sessionService.findSessionById(id);
+    return this.sessionTransformer.toResponse(session);
   }
 
-  // ===================================
-  // ⚠️ ENDPOINT FALTANTE #1 - OBRIGATÓRIO
-  // ===================================
   @Get(':id/seats')
   @ApiOperation({ 
     summary: 'Buscar assentos disponíveis em tempo real',
@@ -58,12 +60,7 @@ export class SessionController {
   @ApiResponse({
     status: 200,
     description: 'Lista de assentos disponíveis',
-    schema: {
-      example: [
-        { id: 'uuid', seatNumber: 'A1', status: 'available' },
-        { id: 'uuid', seatNumber: 'A2', status: 'available' }
-      ]
-    }
+    type: [SeatResponseDto], 
   })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
   async getAvailableSeats(@Param('id') id: string) {

@@ -1,23 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { Reservation } from '../entities/reservation.entity';
 import { Sale } from '../entities/sale.entity';
+import { ReservationResponseDto } from '../dto/reservation-response.dto';
 
 @Injectable()
 export class ReservationTransformer {
-  toResponse(reservation: Reservation) {
+  toResponse(reservation: Reservation): ReservationResponseDto {
     return {
       id: reservation.id,
       userId: reservation.user_id,
       sessionId: reservation.session_id,
       status: reservation.status,
-      seatNumber: reservation.seat?.seat_number, // Pega do relacionamento se existir
+      seatNumber: reservation.seat?.seat_number || 'N/A', 
       expiresAt: reservation.expires_at,
       createdAt: reservation.created_at,
     };
   }
 
-  toResponseList(reservations: Reservation[]) {
-    return reservations.map(r => this.toResponse(r));
+  toResponseList(reservations: Reservation[]): ReservationResponseDto[] {
+    return reservations.map((r) => this.toResponse(r));
   }
 
   toSaleResponse(sale: Sale) {
@@ -26,7 +27,7 @@ export class ReservationTransformer {
       status: 'COMPLETED',
       price: Number(sale.price),
       paymentId: sale.payment_id,
-      ticketCode: sale.id.substring(0, 8).toUpperCase(), // Simulação de código
+      ticketCode: sale.id.split('-')[0].toUpperCase(), 
       purchasedAt: sale.created_at,
     };
   }

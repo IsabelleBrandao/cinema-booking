@@ -2,12 +2,9 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Carrega o .env
 const envPath = path.resolve(__dirname, '../../.env');
 dotenv.config({ path: envPath });
 
-// Funcao auxiliar para corrigir barras no Windows
-// Transforma C:\Users\Src\** em C:/Users/Src/**
 const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 const entitiesPath = path.join(__dirname, '..', '**', '*.entity{.ts,.js}');
@@ -21,7 +18,6 @@ export const databaseConfig: DataSourceOptions = {
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
   
-  // AQUI O SEGREDO: Normalizamos o caminho para usar barras /
   entities: [normalizePath(entitiesPath)],
   migrations: [normalizePath(migrationsPath)],
   

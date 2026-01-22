@@ -11,7 +11,6 @@ export class ReservationExpirationJob {
   // Roda a cada 10 segundos para verificar reservas expiradas
   @Cron('*/10 * * * * *')
   async handleCron() {
-    // this.logger.debug('Verificando reservas expiradas...');
     await this.reservationService.expireReservations();
   }
 }

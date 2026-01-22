@@ -29,29 +29,25 @@ export class SessionService {
       `Criando nova sessão: ${dto.movie_name} - ${dto.room_name}`,
     );
 
-    // INICIO DA TRANSAÇÃO
-    // Garante Atomicidade: Ou cria tudo (sessão + assentos) ou não cria nada.
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       // 1. Validação de Lógica de Negócio
-      // Como usamos @Type(() => Date) no DTO, as datas já chegam como objetos Date aqui
       if (dto.end_time <= dto.start_time) {
         throw new BadRequestException(
           'A data de término deve ser posterior ao início.',
         );
       }
 
-      // 2. Criar a Sessão na memória (ainda não salva)
+      // 2. Criar a Sessão 
       const session = this.sessionRepository.create({
-        ...dto, // Espalha as propriedades do DTO (movie_name, price, etc)
-        available_seats: dto.total_seats, // Começa cheia
+        ...dto, 
+        available_seats: dto.total_seats, 
         is_active: true,
       });
 
-      // Salva a sessão dentro da transação
       const savedSession = await queryRunner.manager.save(session);
 
       // 3. Gerar Assentos Automaticamente
@@ -81,7 +77,7 @@ export class SessionService {
         }
       }
 
-      // Salva todos os assentos de uma vez (Bulk Insert)
+      // Salva todos os assentos de uma vez 
       await queryRunner.manager.save(seats);
 
       // Confirma a transação no banco
@@ -93,7 +89,6 @@ export class SessionService {
 
       return savedSession;
     } catch (error) {
-      // Se deu erro, desfaz tudo
       await queryRunner.rollbackTransaction();
       this.logger.error('Erro ao criar sessão', error);
       throw error;
