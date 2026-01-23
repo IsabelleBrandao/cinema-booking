@@ -27,10 +27,8 @@ async function bootstrap() {
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('Sistema de Reserva de Ingressos (Cinema Booking)')
-    .setDescription(
-      'API distribuída com controle de concorrência, Redis e Kafka.',
-    )
+    .setTitle('Cinema Booking System') 
+    .setDescription('High Concurrency Ticket Booking API with ACID compliance.')
     .setVersion('1.0')
     .addTag('Sessões')
     .addTag('Reservas')
