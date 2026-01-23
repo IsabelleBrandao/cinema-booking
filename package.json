@@ -1,8 +1,8 @@
 {
   "name": "cinema-booking-system",
   "version": "1.0.0",
-  "description": "Sistema de reserva de ingressos de cinema com controle de concorrência",
-  "author": "Seu Nome",
+  "description": "High concurrency cinema ticket booking system with ACID transactions",
+  "author": "Isabelle Brandao",
   "private": true,
   "license": "MIT",
   "scripts": {
